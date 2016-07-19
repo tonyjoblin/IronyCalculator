@@ -1,5 +1,4 @@
-﻿using System;
-using Irony.Parsing;
+﻿using Irony.Parsing;
 
 namespace IronyCalculator
 {
@@ -12,17 +11,17 @@ namespace IronyCalculator
 
             var expressionLine = new NonTerminal("expressionLine");
             var expression = new NonTerminal("expression");
-            var uniaryOp = new NonTerminal("uniaryOp");
+            var unaryOp = new NonTerminal("unaryOp");
             var binaryOp = new NonTerminal("binaryOp");
 
             expression.Rule = number
                                 | variable
                                 | expression + binaryOp + expression
-                                | uniaryOp + expression
+                                | unaryOp + expression
                                 | "(" + expression + ")";
 
             binaryOp.Rule = ToTerm("+") | "-" | "*" | "/" | "**";
-            uniaryOp.Rule = "-";
+            unaryOp.Rule = "-";
             expressionLine.Rule = expression + Eof;
 
             Root = expressionLine;
