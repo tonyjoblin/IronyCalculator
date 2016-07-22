@@ -16,119 +16,175 @@ namespace IronyCalculatorUnitTests
             m_parser = CalculatorGrammar.MakeParser();
         }
 
-        private void AssertIsNumber(ParseTreeNode node, object value)
+        #region helpers
+        
+        /// <summary>
+        /// This recursive method returns a simple string representation
+        /// of a parse tree node. It recursively walks the tree
+        /// and returns the concatenated text for each Terminal.
+        /// If a there are more than one child of a node then
+        /// the text for those children is enclosed in parenthesis.
+        /// </summary>
+        /// <param name="node">A node in the parse tree</param>
+        /// <returns>A string representing the node</returns>
+        private string ParseTreeNodeToString(ParseTreeNode node)
         {
-            Assert.AreEqual("number", node.Term.Name);
-            Assert.AreEqual(value, node.Token.Value);
+            string toString = string.Empty;
+            if (node.Token != null)
+            {
+                toString += node.Token.Text;
+            }
+            else
+            {
+                foreach (var child in node.ChildNodes)
+                {
+                    toString += ParseTreeNodeToString(child);
+                }
+                if (1 < node.ChildNodes.Count)
+                {
+                    toString = $"({toString})";
+                }
+            }
+            return toString;
         }
 
-        private void AssertIsExpression(ParseTreeNode node)
+        private void AssertParseTreeIs(string expected, ParseTree parseTree)
         {
-            Assert.AreEqual("expression", node.Term.Name);
+            var tree = ParseTreeNodeToString(parseTree.Root);
+            Assert.AreEqual(expected, tree);
         }
-
-        private void AssertIsNumberExpression(ParseTreeNode node, object value)
-        {
-            AssertIsExpression(node);
-            Assert.AreEqual(1, node.ChildNodes.Count);
-            AssertIsNumber(node.ChildNodes[0], value);
-        }
-
-        private void AssertIsBinaryOpExpression(ParseTreeNode node, string op)
-        {
-            AssertIsExpression(node);
-            Assert.AreEqual(3, node.ChildNodes.Count);
-            var expectedBinOp = node.ChildNodes[1];
-            AssertIsBinaryOp(expectedBinOp, op);
-        }
-
-        private void AssertIsExpressionLine(ParseTreeNode node)
-        {
-            Assert.AreEqual("expressionLine", node.Term.Name);
-        }
-
-        private void AssertIsBinaryOp(ParseTreeNode node, string op)
-        {
-            Assert.AreEqual("binaryOp", node.Term.Name);
-            Assert.AreEqual(1, node.ChildNodes.Count);
-            Assert.AreEqual(op, node.ChildNodes[0].Token.Text);
-        }
+        #endregion
 
         [TestMethod]
         public void ParseNumber()
         {
             var math = "5";
-
             var tree = m_parser.Parse(math);
-
-            Assert.IsFalse(tree.HasErrors());
-
-            var expectedExpressionLine = tree.Root;
-            AssertIsExpressionLine(expectedExpressionLine);
-
-            var expectedNumberExpression = expectedExpressionLine.ChildNodes[0];
-
-            AssertIsNumberExpression(expectedNumberExpression, 5);
+            AssertParseTreeIs("5", tree);
         }
 
         [TestMethod]
         public void ParseAddition()
         {
             var math = "2 + 3";
-
             var tree = m_parser.Parse(math);
-
-            var expressionLine = tree.Root;
-            AssertIsExpressionLine(expressionLine);
-
-            var topLevelExpression = expressionLine.ChildNodes[0];
-            AssertIsBinaryOpExpression(topLevelExpression, "+");
-
-            var expectedNumber2 = topLevelExpression.ChildNodes[0];
-            AssertIsNumberExpression(expectedNumber2, 2);
-
-            var expectedNumber3 = topLevelExpression.ChildNodes[2];
-            AssertIsNumberExpression(expectedNumber3, 3);
+            AssertParseTreeIs("(2+3)", tree);
         }
 
         [TestMethod]
-        public void OperatorPrecedence_MultipleAdd_MultipleBeforeAdd()
+        public void NegativeNumber()
         {
-            // Expecting something like this:
-            //
-            //expressionLine
-            //  expression
-            //    expression
-            //      expression
-            //        2 (number)
-            //      binaryOp
-            //        * (Key symbol)
-            //      expression
-            //        3 (number)
-            //    binaryOp
-            //      + (Key symbol)
-            //    expression
-            //      4 (number)
-
-            var math = "2 * 3 + 4";
-
+            var math = "- 3";
             var tree = m_parser.Parse(math);
+            AssertParseTreeIs("(-3)", tree);
+        }
 
-            var expressionLine = tree.Root;
-            AssertIsExpressionLine(expressionLine);
+        [TestMethod]
+        public void NegativeVariable()
+        {
+            var math = "-x";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("(-x)", tree);
+        }
 
-            var topLevelExpression = expressionLine.ChildNodes[0];
-            AssertIsBinaryOpExpression(topLevelExpression, "+");
+        [TestMethod]
+        public void NegativeVariableWithAdditions()
+        {
+            var math = "-x+2";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((-x)+2)", tree);
 
-            var expectedTwoMul3Exp = topLevelExpression.ChildNodes[0];
-            AssertIsBinaryOpExpression(expectedTwoMul3Exp, "*");
-            var expectedNumber2 = expectedTwoMul3Exp.ChildNodes[0];
-            AssertIsNumberExpression(expectedNumber2, 2);
-            var expectedNumber3 = expectedTwoMul3Exp.ChildNodes[2];
-            AssertIsNumberExpression(expectedNumber3, 3);
+            math = "2+-x";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(2+(-x))", tree);
+        }
 
-            var expectedNumber4Expr = topLevelExpression.ChildNodes[2];
-            AssertIsNumberExpression(expectedNumber4Expr, 4);
+        [TestMethod]
+        public void NegativeNumberWithAdditions()
+        {
+            var math = "-1+2";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((-1)+2)", tree);
+
+            math = "2+-1";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(2+(-1))", tree);
+        }
+
+        [TestMethod]
+        public void NegativeSomethingInBrackets()
+        {
+            var math = "-(x)";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("(-x)", tree);
+
+            math = "-(1+2)";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(-(1+2))", tree);
+        }
+
+        [TestMethod]
+        public void NegativeSomethingWithMultiplication()
+        {
+            var math = "-x * 2";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((-x)*2)", tree);
+
+            math = "2 * -x";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(2*(-x))", tree);
+        }
+
+        [TestMethod]
+        public void MultiplicationHasPrecedenceOverAddition()
+        {
+            var math = "2 * 3 + 4";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((2*3)+4)", tree);
+
+            math = "4 + 2 * 3";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(4+(2*3))", tree);
+        }
+
+        [TestMethod]
+        public void DivisionHasPrecedenceOverAddition()
+        {
+            var math = "2 / 3 + 4";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((2/3)+4)", tree);
+
+            math = "4 + 2 / 3";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(4+(2/3))", tree);
+        }
+
+        [TestMethod]
+        public void DivisionHasPrecedenceOverSubtraction()
+        {
+            var math = "2 / 3 - 4";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((2/3)-4)", tree);
+
+            math = "4 - 2 / 3";
+            tree = m_parser.Parse(math);
+            AssertParseTreeIs("(4-(2/3))", tree);
+        }
+
+        [TestMethod]
+        public void DivisionHasLeftAssociativity()
+        {
+            var math = "2 / 3 / 4";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((2/3)/4)", tree);
+        }
+
+        [TestMethod]
+        public void SubtractionHasLeftAssociativity()
+        {
+            var math = "2 - 3 - 4";
+            var tree = m_parser.Parse(math);
+            AssertParseTreeIs("((2-3)-4)", tree);
         }
     }
 }
